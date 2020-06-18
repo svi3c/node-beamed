@@ -24,11 +24,8 @@ export type RequestBody<K extends keyof T, T> = Body<K, "req", T>;
 export type ResponseBody<K extends keyof T, T> = Body<K, "res", T>;
 export type RequestParams<K extends keyof T, T> = T[K] extends {
   req?: infer Req;
-  res?: infer Res;
 }
-  ? Res extends string | void
-    ? Req extends void
-      ? []
-      : [Req]
-    : [Req, true]
+  ? Req extends void
+    ? []
+    : [Req]
   : [];

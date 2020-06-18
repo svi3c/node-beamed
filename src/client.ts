@@ -8,14 +8,13 @@ import {
   MessageHandler,
 } from "./types";
 import { RequestError } from "./error";
+import { serializePayload, deserializePayload } from "./shared";
 
 export class NanoClient<T> extends EventEmitter {
   private nextRequestId = 1;
   private socket: NanoSocket;
   private retryCount = 0;
   private target: string | { host?: string; port: number };
-  private reconnect: boolean;
-  private reconnectTimeout: number | ((count: number) => number);
   private requests: {
     [id in number]: (success: boolean, payload: string) => void;
   } = {};
@@ -23,23 +22,20 @@ export class NanoClient<T> extends EventEmitter {
     [topic in number | string]: Set<MessageHandler<any, any>>;
   } = {};
   private closed = true;
+  private reconnectTimeout?: NodeJS.Timeout;
 
   constructor(
     target: string | { host?: string; port: number },
     {
-      reconnect = true,
-      reconnectTimeout = 1000,
+      reconnect = 1000,
     }: {
-      reconnect?: boolean;
-      reconnectTimeout?: number | ((count: number) => number);
+      reconnect?: number | ((count: number) => number);
     } = {}
   ) {
     super();
     const socket = new Socket();
     this.socket = new NanoSocket(socket);
     this.target = target;
-    this.reconnect = reconnect;
-    this.reconnectTimeout = reconnectTimeout;
     this.socket.on("message", (message: string) => {
       const idx = message.indexOf("|", 2);
       const type = message[0];
@@ -55,10 +51,27 @@ export class NanoClient<T> extends EventEmitter {
         }
         case "!": {
           this.messageHandlers[topicOrRequestId]?.forEach((handler) =>
-            handler(payload)
+            handler(deserializePayload(payload))
           );
         }
       }
+    });
+    if (reconnect) {
+      socket.on("close", () => {
+        if (!this.closed) {
+          this.reconnectTimeout = setTimeout(
+            () => this.connect(),
+            typeof reconnect === "number"
+              ? reconnect
+              : reconnect(this.retryCount++)
+          );
+        }
+      });
+    }
+    socket.on("error", (e) => {
+      console.warn(`Error connecting to ${this.target}`);
+      console.warn(e.stack || e);
+      this.emit("error", e);
     });
   }
 
@@ -66,16 +79,12 @@ export class NanoClient<T> extends EventEmitter {
     topic: K,
     ...[payload]: MessageBody<K, T> extends void ? [] : [MessageBody<K, T>]
   ) {
-    return this.socket.send(
-      `!${topic}|${
-        typeof payload === "string" ? payload : JSON.stringify(payload)
-      }`
-    );
+    return this.socket.send(`!${topic}|${serializePayload(payload)}`);
   }
 
   async request<K extends keyof T>(
     topic: K,
-    ...[payload, parse]: RequestParams<K, T>
+    ...[payload]: RequestParams<K, T>
   ): Promise<ResponseBody<K, T>> {
     const requestId = this.nextRequestId++;
     return (
@@ -83,7 +92,7 @@ export class NanoClient<T> extends EventEmitter {
         new Promise<any>((resolve, reject) => {
           this.requests[requestId] = (success: boolean, payload: any) => {
             if (success) {
-              resolve(parse ? JSON.parse(payload) : payload);
+              resolve(deserializePayload(payload));
             } else {
               const idx = payload.indexOf("|");
               const code = payload.substr(0, idx);
@@ -96,39 +105,22 @@ export class NanoClient<T> extends EventEmitter {
             }
           };
         }),
-        this.socket.send(
-          `?${topic}|${requestId}|${
-            typeof payload === "string" ? payload : JSON.stringify(payload)
-          }`
-        ),
+        this.socket.send(`?${topic}|${requestId}|${serializePayload(payload)}`),
       ])
     )[0];
   }
 
-  async subscribe<K extends keyof T>(
-    topic: K,
-    handler: MessageHandler<K, T>,
-    ...[parse]: T[K] extends {
-      push?: infer Push;
-    }
-      ? Push extends string | void
-        ? []
-        : [true]
-      : []
-  ) {
-    const fn = parse
-      ? (payload: string) => handler(JSON.parse(payload))
-      : (handler as any);
+  async subscribe<K extends keyof T>(topic: K, handler: MessageHandler<K, T>) {
     const handlers =
       this.messageHandlers[topic as number | string] || new Set();
     this.messageHandlers[topic as number | string] = handlers;
-    handlers.add(fn);
+    handlers.add(handler);
     const requestId = this.nextRequestId++;
     if (handlers.size === 1) {
       await this.socket.send(`+${topic}|${requestId}`);
     }
     return async () => {
-      handlers.delete(fn);
+      handlers.delete(handler);
       if (handlers.size === 0) {
         delete this.messageHandlers[topic as number | string];
         await this.socket.send(`-${topic}`);
@@ -136,7 +128,7 @@ export class NanoClient<T> extends EventEmitter {
     };
   }
 
-  async connect() {
+  connect() {
     this.emit("connecting");
     const socket = this.socket.socket;
     this.closed = false;
@@ -145,25 +137,13 @@ export class NanoClient<T> extends EventEmitter {
     } else {
       socket.connect(this.target.port, this.target.host!);
     }
-    if (this.reconnect) {
-      socket.on("close", () => {
-        if (!this.closed) {
-          const delay =
-            typeof this.reconnectTimeout === "function"
-              ? this.reconnectTimeout(this.retryCount++)
-              : this.retryCount;
-          setTimeout(() => this.connect(), delay);
-        }
-      });
-    }
-    socket.on("error", (e) => {
-      console.warn(`Error connecting to ${this.target}`);
-      console.warn(e.stack || e);
-      this.emit("error", e);
-    });
+    return this;
   }
 
   async close() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
     this.closed = true;
     this.socket.socket.end();
   }

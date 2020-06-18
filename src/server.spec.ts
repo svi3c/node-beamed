@@ -1,7 +1,5 @@
-import { Server } from "net";
 import { NanoClient } from "./client";
 import { NanoServer } from "./server";
-import { promisify } from "util";
 import { RequestError } from "./error";
 
 enum Errors {
@@ -14,42 +12,32 @@ enum Topics {
 
 interface Api {
   [Topics.test]: {
-    msg: {
-      foo: "bar";
-    };
-    push: {
-      foo: "bar";
-    };
-    req: {
-      foo: "bar";
-    };
+    msg: { foo: "bar" };
+    push: { foo: "bar" };
+    req: { foo: "bar" };
     res: { bar: "baz" };
   };
 }
 
 describe("NanoServer + NanoClient", () => {
-  let server: Server;
   let ns: NanoServer<Api>;
   let nc: NanoClient<Api>;
 
   beforeEach(async () => {
-    server = new Server();
-    await promisify(server.listen.bind(server))("/tmp/lean-tcp-test");
-    ns = new NanoServer<Api>(server);
+    ns = new NanoServer<Api>().listen("/tmp/lean-tcp-test");
     nc = new NanoClient<Api>("/tmp/lean-tcp-test");
-    ns.listen();
     nc.connect();
   });
 
   afterEach(() => {
     nc.close();
-    return new Promise((resolve) => server.close(resolve));
+    return new Promise((resolve) => ns.close(resolve));
   });
 
   describe("send()", () => {
     it("should send and receive a message", async () => {
       const result = new Promise((resolve) =>
-        ns.onMessage(Topics.test, resolve, true)
+        ns.onMessage(Topics.test, resolve)
       );
       await nc.send(Topics.test, { foo: "bar" });
       expect(await result).toEqual({ foo: "bar" });
@@ -58,32 +46,24 @@ describe("NanoServer + NanoClient", () => {
 
   describe("request()", () => {
     it("should send a request and response message", async () => {
-      ns.onRequest(
-        Topics.test,
-        (payload) => {
-          expect(payload).toEqual({ foo: "bar" });
-          return { bar: "baz" } as { bar: "baz" };
-        },
-        true
-      );
+      ns.onRequest(Topics.test, (payload) => {
+        expect(payload).toEqual({ foo: "bar" });
+        return { bar: "baz" } as { bar: "baz" };
+      });
 
-      const response = await nc.request(Topics.test, { foo: "bar" }, true);
+      const response = await nc.request(Topics.test, { foo: "bar" });
 
       expect(response).toEqual({ bar: "baz" });
     });
 
     it("should correctly handle errors", async () => {
       expect.assertions(2);
-      ns.onRequest(
-        Topics.test,
-        () => {
-          throw new RequestError(Errors.test, "Test message");
-        },
-        true
-      );
+      ns.onRequest(Topics.test, () => {
+        throw new RequestError(Errors.test, "Test message");
+      });
 
       try {
-        await nc.request(Topics.test, { foo: "bar" }, true);
+        await nc.request(Topics.test, { foo: "bar" });
       } catch (e) {
         expect(e.code).toEqual(Errors.test);
         expect(e.message).toEqual("Test message");
@@ -95,7 +75,7 @@ describe("NanoServer + NanoClient", () => {
     it("should register for multicast messages", async () => {
       const listener = jest.fn();
 
-      await nc.subscribe(Topics.test, listener, true);
+      await nc.subscribe(Topics.test, listener);
       await wait();
       await ns.push(Topics.test, { foo: "bar" });
       await wait();
@@ -105,7 +85,7 @@ describe("NanoServer + NanoClient", () => {
 
     it("should return an unsubscribe callback", async () => {
       const listener = jest.fn();
-      const unsubscribe = await nc.subscribe(Topics.test, listener, true);
+      const unsubscribe = await nc.subscribe(Topics.test, listener);
       await wait();
 
       await ns.push(Topics.test, { foo: "bar" });
