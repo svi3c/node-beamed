@@ -1,4 +1,4 @@
-# lean-ipc
+# nano-net
 
 A blazing fast, slim communication protocol for IPC.
 
