@@ -34,9 +34,9 @@ describe("NanoServer + NanoClient", () => {
 
   beforeEach(async () => {
     server = new Server();
-    await promisify(server.listen.bind(server))(3333);
+    await promisify(server.listen.bind(server))("/tmp/lean-tcp-test");
     ns = new NanoServer<Api>(server);
-    nc = new NanoClient<Api>({ port: 3333 });
+    nc = new NanoClient<Api>("/tmp/lean-tcp-test");
     ns.listen();
     nc.connect();
   });
