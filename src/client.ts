@@ -8,7 +8,7 @@ import type {
   MessageHandler,
 } from "./types";
 import { RequestError } from "./error";
-import { serializePayload, deserializePayload } from "./shared";
+import { serialize, deserialize } from "./shared";
 
 export class NanoClient<T> extends EventEmitter {
   private nextRequestId = 1;
@@ -51,7 +51,7 @@ export class NanoClient<T> extends EventEmitter {
         }
         case "!": {
           this.messageHandlers[topicOrRequestId]?.forEach((handler) =>
-            handler(deserializePayload(payload))
+            handler(deserialize(payload))
           );
         }
       }
@@ -79,7 +79,7 @@ export class NanoClient<T> extends EventEmitter {
     topic: K,
     ...[payload]: MessageBody<K, T> extends void ? [] : [MessageBody<K, T>]
   ) {
-    return this.socket.send(`!${topic}|${serializePayload(payload)}`);
+    return this.socket.send(`!${topic}|${serialize(payload)}`);
   }
 
   async request<K extends keyof T>(
@@ -92,7 +92,7 @@ export class NanoClient<T> extends EventEmitter {
         new Promise<any>((resolve, reject) => {
           this.requests[requestId] = (success: boolean, payload: any) => {
             if (success) {
-              resolve(deserializePayload(payload));
+              resolve(deserialize(payload));
             } else {
               const idx = payload.indexOf("|");
               const code = payload.substr(0, idx);
@@ -105,7 +105,7 @@ export class NanoClient<T> extends EventEmitter {
             }
           };
         }),
-        this.socket.send(`?${topic}|${requestId}|${serializePayload(payload)}`),
+        this.socket.send(`?${topic}|${requestId}|${serialize(payload)}`),
       ])
     )[0];
   }

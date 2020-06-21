@@ -97,6 +97,34 @@ describe("NanoServer + NanoClient", () => {
       expect(listener).toHaveBeenCalledTimes(1);
     });
   });
+
+  it("Example", async () => {
+    class Credentials {
+      constructor(username: string, password: string) {}
+    }
+    type User = any;
+    const authenticate = () => null;
+    enum AuthTopics {
+      login,
+    }
+    interface AuthApi {
+      [AuthTopics.login]: {
+        req: Credentials;
+        res: User;
+      };
+    }
+
+    const ns = new NanoServer<AuthApi>()
+      .onRequest(AuthTopics.login, () => authenticate)
+      .listen("/tmp/auth-test");
+
+    const nc = new NanoClient<AuthApi>("/tmp/auth-test").connect();
+    await nc
+      .request(AuthTopics.login, new Credentials("user", "p4ssw0rd"))
+      .then((user) => console.log(user));
+
+    ns.close();
+  });
 });
 
 const wait = (delay = 3) =>

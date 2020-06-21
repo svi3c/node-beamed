@@ -1,7 +1,7 @@
 import { ListenOptions, Server } from "net";
 import { NanoSocket } from "./socket";
 import type { MessageHandler, RequestHandler, PushBody } from "./types";
-import { deserializePayload, serializePayload } from "./shared";
+import { deserialize, serialize } from "./shared";
 
 export class NanoServer<T> {
   private sockets: NanoSocket[] = [];
@@ -33,15 +33,15 @@ export class NanoServer<T> {
             break;
           case "!":
             this.messageHandlers[topic]?.forEach((handler) =>
-              handler(deserializePayload(tokens[1]))
+              handler(deserialize(tokens[1]))
             );
             break;
           case "?":
             try {
               const result = await this.requestHandlers[topic]?.(
-                deserializePayload(tokens[2])
+                deserialize(tokens[2])
               );
-              socket.send(`.${tokens[1]}|${serializePayload(result)}`);
+              socket.send(`.${tokens[1]}|${serialize(result)}`);
             } catch (e) {
               socket.send(`X${tokens[1]}|${e.code}|${e.message}`);
             }
@@ -85,7 +85,7 @@ export class NanoServer<T> {
   ) {
     return Promise.all(
       this.sockets.map((socket) =>
-        socket.send(`!${topic}|${serializePayload(payload)}`)
+        socket.send(`!${topic}|${serialize(payload)}`)
       )
     );
   }

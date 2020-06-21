@@ -12,6 +12,8 @@ A blazing fast, slim communication protocol for IPC.
 
 ## Example
 
+`shared.ts`
+
 ```ts
 enum AuthTopics {
   login,
@@ -22,15 +24,26 @@ interface AuthApi {
     res: User;
   };
 }
-const ns = new NanoServer<AuthApi>();
-ns.listen("/tmp/auth-test");
-ns.onRequest(AuthTopics.login, authenticate);
+```
 
-const nc = new NanoClient<AuthApi>("/tmp/auth-test");
-nc.connect();
-const user = await nc.request(
-  AuthTopics.login,
-  new Credentials("user", "p4ssw0rd")
+`server.ts`
+
+```ts
+import { AuthApi, AuthTopics } from "./shared";
+
+const ns = new NanoServer<AuthApi>()
+  .onRequest(AuthTopics.login, authenticate)
+  .listen("/tmp/auth-test");
+```
+
+`client.ts`
+
+```ts
+import { AuthApi, AuthTopics } from "./shared";
+
+const nc = new NanoClient<AuthApi>("/tmp/auth-test").connect();
+nc.request(AuthTopics.login, new Credentials("user", "p4ssw0rd")).then((user) =>
+  console.log(user)
 );
 ```
 
