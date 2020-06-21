@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import { Socket } from "net";
 import { NanoSocket } from "./socket";
-import {
+import type {
   MessageBody,
   RequestParams,
   ResponseBody,

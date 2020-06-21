@@ -1,6 +1,6 @@
 import { ListenOptions, Server } from "net";
 import { NanoSocket } from "./socket";
-import { MessageHandler, RequestHandler, PushBody } from "./types";
+import type { MessageHandler, RequestHandler, PushBody } from "./types";
 import { deserializePayload, serializePayload } from "./shared";
 
 export class NanoServer<T> {
