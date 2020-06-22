@@ -12,10 +12,10 @@ enum Topics {
 
 interface Api {
   [Topics.test]: {
-    msg: { foo: "bar" };
-    push: { foo: "bar" };
-    req: { foo: "bar" };
-    res: { bar: "baz" };
+    msg: { foo: string };
+    push: { foo: string };
+    req: { foo: string };
+    res: { bar: string };
   };
 }
 
@@ -23,107 +23,81 @@ describe("NanoServer + NanoClient", () => {
   let ns: NanoServer<Api>;
   let nc: NanoClient<Api>;
 
-  beforeEach(async () => {
-    ns = new NanoServer<Api>().listen("/tmp/lean-tcp-test");
-    nc = new NanoClient<Api>("/tmp/lean-tcp-test");
-    nc.connect();
-  });
-
-  afterEach(() => {
-    nc.close();
-    return new Promise((resolve) => ns.close(resolve));
-  });
-
-  describe("send()", () => {
-    it("should send and receive a message", async () => {
-      const result = new Promise((resolve) =>
-        ns.onMessage(Topics.test, resolve)
-      );
-      await nc.send(Topics.test, { foo: "bar" });
-      expect(await result).toEqual({ foo: "bar" });
+  describe("Unix", () => {
+    beforeEach(async () => {
+      ns = new NanoServer<Api>().listen("/tmp/lean-tcp-test");
+      nc = new NanoClient<Api>("/tmp/lean-tcp-test");
+      nc.connect();
     });
-  });
 
-  describe("request()", () => {
-    it("should send a request and response message", async () => {
-      ns.onRequest(Topics.test, (payload) => {
-        expect(payload).toEqual({ foo: "bar" });
-        return { bar: "baz" } as { bar: "baz" };
+    afterEach(() => {
+      nc.close();
+      return new Promise((resolve) => ns.close(resolve));
+    });
+
+    describe("send()", () => {
+      it("should send and receive a message", async () => {
+        const result = new Promise((resolve) =>
+          ns.onMessage(Topics.test, resolve)
+        );
+        await nc.send(Topics.test, { foo: "bar" });
+        expect(await result).toEqual({ foo: "bar" });
+      });
+    });
+
+    describe("request()", () => {
+      it("should send a request and response message", async () => {
+        ns.onRequest(Topics.test, (payload) => {
+          expect(payload).toEqual({ foo: "bar" });
+          return { bar: "baz" };
+        });
+
+        const response = await nc.request(Topics.test, { foo: "bar" });
+
+        expect(response).toEqual({ bar: "baz" });
       });
 
-      const response = await nc.request(Topics.test, { foo: "bar" });
+      it("should correctly handle errors", async () => {
+        expect.assertions(2);
+        ns.onRequest(Topics.test, () => {
+          throw new RequestError(Errors.test, "Test message");
+        });
 
-      expect(response).toEqual({ bar: "baz" });
+        try {
+          await nc.request(Topics.test, { foo: "bar" });
+        } catch (e) {
+          expect(e.code).toEqual(Errors.test);
+          expect(e.message).toEqual("Test message");
+        }
+      });
     });
 
-    it("should correctly handle errors", async () => {
-      expect.assertions(2);
-      ns.onRequest(Topics.test, () => {
-        throw new RequestError(Errors.test, "Test message");
+    describe("subscribe()", () => {
+      it("should register for multicast messages", async () => {
+        const listener = jest.fn();
+
+        await nc.subscribe(Topics.test, listener);
+        await wait();
+        await ns.push(Topics.test, { foo: "bar" });
+        await wait();
+
+        expect(listener).toHaveBeenCalledWith({ foo: "bar" });
       });
 
-      try {
-        await nc.request(Topics.test, { foo: "bar" });
-      } catch (e) {
-        expect(e.code).toEqual(Errors.test);
-        expect(e.message).toEqual("Test message");
-      }
+      it("should return an unsubscribe callback", async () => {
+        const listener = jest.fn();
+        const unsubscribe = await nc.subscribe(Topics.test, listener);
+        await wait();
+
+        await ns.push(Topics.test, { foo: "bar" });
+        await wait();
+        await unsubscribe();
+        await ns.push(Topics.test, { foo: "bar" });
+        await wait();
+
+        expect(listener).toHaveBeenCalledTimes(1);
+      });
     });
-  });
-
-  describe("subscribe()", () => {
-    it("should register for multicast messages", async () => {
-      const listener = jest.fn();
-
-      await nc.subscribe(Topics.test, listener);
-      await wait();
-      await ns.push(Topics.test, { foo: "bar" });
-      await wait();
-
-      expect(listener).toHaveBeenCalledWith({ foo: "bar" });
-    });
-
-    it("should return an unsubscribe callback", async () => {
-      const listener = jest.fn();
-      const unsubscribe = await nc.subscribe(Topics.test, listener);
-      await wait();
-
-      await ns.push(Topics.test, { foo: "bar" });
-      await wait();
-      await unsubscribe();
-      await ns.push(Topics.test, { foo: "bar" });
-      await wait();
-
-      expect(listener).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it("Example", async () => {
-    class Credentials {
-      constructor(username: string, password: string) {}
-    }
-    type User = any;
-    const authenticate = () => null;
-    enum AuthTopics {
-      login,
-    }
-    interface AuthApi {
-      [AuthTopics.login]: {
-        req: Credentials;
-        res: User;
-      };
-    }
-
-    const ns = new NanoServer<AuthApi>()
-      .onRequest(AuthTopics.login, () => authenticate)
-      .listen("/tmp/auth-test");
-
-    const nc = new NanoClient<AuthApi>("/tmp/auth-test").connect();
-    await nc
-      .request(AuthTopics.login, new Credentials("user", "p4ssw0rd"))
-      .then((user) => console.log(user));
-
-    ns.close();
   });
 });
 
