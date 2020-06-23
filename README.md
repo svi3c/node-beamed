@@ -1,12 +1,12 @@
-# nano-net
+# beamed
 
 A blazing fast, slim communication protocol for IPC.
 
 ## Goals
 
-- [ ] Support Unix, Windows, TCP and TLS sockets
-- [x] Completely typed TypeScript API for certain topics
 - [x] Minimal protocol overhead
+- [x] Shared TypeScript API for your endpoints
+- [x] Support Unix, Windows, TCP and TLS sockets
 - [x] Requesting, messaging and publish / subscribe
 - [x] No third party dependencies
 
@@ -16,7 +16,7 @@ A blazing fast, slim communication protocol for IPC.
 
 ```ts
 enum AuthTopics {
-  login,
+  login, // can be strings or numbers
 }
 interface AuthApi {
   [AuthTopics.login]: {
@@ -31,7 +31,7 @@ interface AuthApi {
 ```ts
 import { AuthApi, AuthTopics } from "./shared";
 
-const ns = new NanoServer<AuthApi>()
+const ns = new BeamServer<AuthApi>()
   .onRequest(AuthTopics.login, authenticate)
   .listen("/tmp/auth-test");
 ```
@@ -41,7 +41,7 @@ const ns = new NanoServer<AuthApi>()
 ```ts
 import { AuthApi, AuthTopics } from "./shared";
 
-const nc = new NanoClient<AuthApi>("/tmp/auth-test").connect();
+const nc = new BeamClient<AuthApi>("/tmp/auth-test").connect();
 nc.request(AuthTopics.login, new Credentials("user", "p4ssw0rd")).then((user) =>
   console.log(user)
 );

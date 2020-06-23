@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import { Socket } from "net";
 import { promisify } from "util";
 
-export class NanoSocket extends EventEmitter {
+export class BeamSocket extends EventEmitter {
   private buffered = "";
   private write = promisify(this.socket.write.bind(this.socket));
 

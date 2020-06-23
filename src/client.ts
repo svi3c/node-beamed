@@ -1,18 +1,18 @@
 import { EventEmitter } from "events";
 import { Socket } from "net";
-import { NanoSocket } from "./socket";
+import { BeamSocket } from "./socket";
 import type {
   MessageBody,
   RequestParams,
   ResponseBody,
   MessageHandler,
 } from "./types";
-import { RequestError } from "./error";
+import { BeamError } from "./error";
 import { serialize, deserialize } from "./shared";
 
-export class NanoClient<T> extends EventEmitter {
+export class BeamClient<T> extends EventEmitter {
   private nextRequestId = 1;
-  private socket: NanoSocket;
+  private socket: BeamSocket;
   private retryCount = 0;
   private target: string | { host?: string; port: number };
   private requests: {
@@ -34,7 +34,7 @@ export class NanoClient<T> extends EventEmitter {
   ) {
     super();
     const socket = new Socket();
-    this.socket = new NanoSocket(socket);
+    this.socket = new BeamSocket(socket);
     this.target = target;
     this.socket.on("message", (message: string) => {
       const idx = message.indexOf("|", 2);
@@ -97,7 +97,7 @@ export class NanoClient<T> extends EventEmitter {
               const idx = payload.indexOf("|");
               const code = payload.substr(0, idx);
               reject(
-                new RequestError(
+                new BeamError(
                   isNaN(Number(code)) ? code : Number(code),
                   payload.substr(idx + 1)
                 )

@@ -1,4 +1,4 @@
-export class RequestError<T extends number | string> extends Error {
+export class BeamError<T extends number | string> extends Error {
   constructor(public code: T, message?: string) {
     super(message);
   }

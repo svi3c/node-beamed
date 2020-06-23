@@ -1,6 +1,6 @@
-import { NanoClient } from "./client";
-import { NanoServer } from "./server";
-import { RequestError } from "./error";
+import { BeamClient } from "./client";
+import { BeamServer } from "./server";
+import { BeamError } from "./error";
 
 enum Errors {
   test,
@@ -19,14 +19,14 @@ interface Api {
   };
 }
 
-describe("NanoServer + NanoClient", () => {
-  let ns: NanoServer<Api>;
-  let nc: NanoClient<Api>;
+describe("BeamServer + BeamClient", () => {
+  let ns: BeamServer<Api>;
+  let nc: BeamClient<Api>;
 
   describe("Unix", () => {
     beforeEach(async () => {
-      ns = new NanoServer<Api>().listen("/tmp/lean-tcp-test");
-      nc = new NanoClient<Api>("/tmp/lean-tcp-test");
+      ns = new BeamServer<Api>().listen("/tmp/lean-tcp-test");
+      nc = new BeamClient<Api>("/tmp/lean-tcp-test");
       nc.connect();
     });
 
@@ -60,7 +60,7 @@ describe("NanoServer + NanoClient", () => {
       it("should correctly handle errors", async () => {
         expect.assertions(2);
         ns.onRequest(Topics.test, () => {
-          throw new RequestError(Errors.test, "Test message");
+          throw new BeamError(Errors.test, "Test message");
         });
 
         try {

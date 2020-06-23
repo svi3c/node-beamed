@@ -1,5 +1,5 @@
 {
-  "name": "nano-net",
+  "name": "beamed",
   "version": "0.1.0",
   "description": "A lean IPC communication protocol",
   "main": "dist/index.js",
@@ -8,7 +8,7 @@
     "name": "Sven Rogge"
   },
   "license": "MIT",
-  "repository": "github:svi3c/nano-net",
+  "repository": "github:svi3c/node-beamed",
   "scripts": {
     "build": "tsc",
     "test": "jest",

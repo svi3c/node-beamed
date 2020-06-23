@@ -1,11 +1,11 @@
 import { ListenOptions, Server } from "net";
-import { NanoSocket } from "./socket";
+import { BeamSocket } from "./socket";
 import type { MessageHandler, RequestHandler, PushBody } from "./types";
 import { deserialize, serialize } from "./shared";
 
-export class NanoServer<T> {
-  private sockets: NanoSocket[] = [];
-  private subscriptions: { [topic in number | string]: Set<NanoSocket> } = {};
+export class BeamServer<T> {
+  private sockets: BeamSocket[] = [];
+  private subscriptions: { [topic in number | string]: Set<BeamSocket> } = {};
   private messageHandlers: {
     [topic in number | string]: Set<(payload: any) => void>;
   } = {};
@@ -15,7 +15,7 @@ export class NanoServer<T> {
 
   constructor(private server = new Server()) {
     this.server.on("connection", (s) => {
-      const socket = new NanoSocket(s);
+      const socket = new BeamSocket(s);
       socket.on("message", async (message: string) => {
         const type = message[0];
         const tokens = message.substr(1).split("|");
