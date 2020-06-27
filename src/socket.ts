@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
 import { Socket } from "net";
 import { promisify } from "util";
+import { DELIMITER } from "./shared";
 
 export class BeamSocket extends EventEmitter {
   private buffered = "";
@@ -13,12 +14,12 @@ export class BeamSocket extends EventEmitter {
 
   async send(message: string) {
     await this.waitForConnection();
-    await this.write(`${message}§$§`);
+    await this.write(`${message}${DELIMITER}`);
   }
 
   private async attachEventListeners() {
     this.socket.on("data", (data) => {
-      const chunks = data.toString().split("§$§");
+      const chunks = data.toString().split(DELIMITER);
       if (chunks.length > 1) {
         const complete = [this.buffered + chunks[0], ...chunks.slice(1, -1)];
         complete.forEach((message) => {
