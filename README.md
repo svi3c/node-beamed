@@ -29,9 +29,10 @@ interface AuthApi {
 `server.ts`
 
 ```ts
+import { BeamServer } from "beamed";
 import { AuthApi, AuthTopics } from "./shared";
 
-const ns = new BeamServer<AuthApi>()
+const bs = new BeamServer<AuthApi>()
   .onRequest(AuthTopics.login, authenticate)
   .listen("/tmp/auth-test");
 ```
@@ -39,10 +40,11 @@ const ns = new BeamServer<AuthApi>()
 `client.ts`
 
 ```ts
+import { BeamClient } from "beamed";
 import { AuthApi, AuthTopics } from "./shared";
 
-const nc = new BeamClient<AuthApi>("/tmp/auth-test").connect();
-nc.request(AuthTopics.login, new Credentials("user", "p4ssw0rd")).then((user) =>
+const bc = new BeamClient<AuthApi>("/tmp/auth-test").connect();
+bc.request(AuthTopics.login, new Credentials("user", "p4ssw0rd")).then((user) =>
   console.log(user)
 );
 ```
