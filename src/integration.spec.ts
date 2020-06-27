@@ -20,51 +20,51 @@ interface Api {
 }
 
 describe("BeamServer + BeamClient", () => {
-  let ns: BeamServer<Api>;
-  let nc: BeamClient<Api>;
+  let bs: BeamServer<Api>;
+  let bc: BeamClient<Api>;
 
   describe("Unix", () => {
     beforeEach(async () => {
-      ns = new BeamServer<Api>().listen("/tmp/lean-tcp-test");
-      nc = new BeamClient<Api>("/tmp/lean-tcp-test");
-      nc.connect();
+      bs = new BeamServer<Api>().listen("/tmp/lean-tcp-test");
+      bc = new BeamClient<Api>("/tmp/lean-tcp-test");
+      bc.connect();
     });
 
     afterEach(() => {
-      nc.close();
-      return new Promise((resolve) => ns.close(resolve));
+      bc.close();
+      return new Promise((resolve) => bs.close(resolve));
     });
 
     describe("send()", () => {
       it("should send and receive a message", async () => {
         const result = new Promise((resolve) =>
-          ns.onMessage(Topics.test, resolve)
+          bs.onMessage(Topics.test, resolve)
         );
-        await nc.send(Topics.test, { foo: "bar" });
+        await bc.send(Topics.test, { foo: "bar" });
         expect(await result).toEqual({ foo: "bar" });
       });
     });
 
     describe("request()", () => {
       it("should send a request and response message", async () => {
-        ns.onRequest(Topics.test, (payload) => {
+        bs.onRequest(Topics.test, (payload) => {
           expect(payload).toEqual({ foo: "bar" });
           return { bar: "baz" };
         });
 
-        const response = await nc.request(Topics.test, { foo: "bar" });
+        const response = await bc.request(Topics.test, { foo: "bar" });
 
         expect(response).toEqual({ bar: "baz" });
       });
 
       it("should correctly handle errors", async () => {
         expect.assertions(2);
-        ns.onRequest(Topics.test, () => {
+        bs.onRequest(Topics.test, () => {
           throw new BeamError(Errors.test, "Test message");
         });
 
         try {
-          await nc.request(Topics.test, { foo: "bar" });
+          await bc.request(Topics.test, { foo: "bar" });
         } catch (e) {
           expect(e.code).toEqual(Errors.test);
           expect(e.message).toEqual("Test message");
@@ -76,9 +76,9 @@ describe("BeamServer + BeamClient", () => {
       it("should register for multicast messages", async () => {
         const listener = jest.fn();
 
-        await nc.subscribe(Topics.test, listener);
+        await bc.subscribe(Topics.test, listener);
         await wait();
-        await ns.push(Topics.test, { foo: "bar" });
+        await bs.push(Topics.test, { foo: "bar" });
         await wait();
 
         expect(listener).toHaveBeenCalledWith({ foo: "bar" });
@@ -86,13 +86,13 @@ describe("BeamServer + BeamClient", () => {
 
       it("should return an unsubscribe callback", async () => {
         const listener = jest.fn();
-        const unsubscribe = await nc.subscribe(Topics.test, listener);
+        const unsubscribe = await bc.subscribe(Topics.test, listener);
         await wait();
 
-        await ns.push(Topics.test, { foo: "bar" });
+        await bs.push(Topics.test, { foo: "bar" });
         await wait();
         await unsubscribe();
-        await ns.push(Topics.test, { foo: "bar" });
+        await bs.push(Topics.test, { foo: "bar" });
         await wait();
 
         expect(listener).toHaveBeenCalledTimes(1);
