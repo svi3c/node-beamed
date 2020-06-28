@@ -1,7 +1,7 @@
 {
   "name": "beamed",
   "version": "0.1.0",
-  "description": "A lean IPC communication protocol",
+  "description": "A blazing fast, slim communication protocol for NodeJS IPC",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "author": {
@@ -30,6 +30,9 @@
     "net",
     "ipc",
     "messaging",
-    "protocol"
+    "protocol",
+    "socket",
+    "server",
+    "client"
   ]
 }
