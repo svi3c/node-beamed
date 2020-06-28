@@ -2,7 +2,9 @@
 
 [![Build Status](https://travis-ci.com/svi3c/node-beamed.svg?branch=master)](https://travis-ci.com/github/svi3c/node-beamed)
 
-A blazing fast, slim communication protocol for NodeJS IPC.
+> A blazing fast, slim communication protocol for NodeJS IPC.
+
+[![NPM](https://nodei.co/npm/beamed.png)](https://www.npmjs.com/package/beamed)
 
 ## Features
 
