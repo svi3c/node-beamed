@@ -1,6 +1,6 @@
 {
   "name": "beamed",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A blazing fast, slim communication protocol for NodeJS IPC",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
