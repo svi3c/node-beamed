@@ -1,14 +1,18 @@
 # beamed
 
-A blazing fast, slim communication protocol for IPC.
+A blazing fast, slim communication protocol for NodeJS IPC.
 
-## Goals
+## Features
 
-- [x] Minimal protocol overhead
-- [x] Shared TypeScript API for your endpoints
-- [x] Support Unix, Windows, TCP and TLS sockets
-- [x] Requesting, messaging and publish / subscribe
-- [x] No third party dependencies
+- A lightweight protocol minimizes network traffic and provides high processing performance
+- The TypeScript API enables you to specify strictly typed endpoints and reuse the same type definitions on client and server side
+- Support for Unix, Windows, TCP
+- Requesting, messaging and publish / subscribe
+- No third party dependencies
+
+### Coming soon
+
+- [ ] Support for TLS
 
 ## Example
 
