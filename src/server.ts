@@ -103,3 +103,7 @@ export class BeamServer<T> {
     return this;
   }
 }
+
+export function createServer<T>(server?: Server) {
+  return new BeamServer<T>(server);
+}

@@ -1,20 +1,22 @@
 import { EventEmitter } from "events";
-import { Socket } from "net";
+import { Socket, SocketConnectOpts } from "net";
+import { ConnectionOptions, TLSSocket, connect as connectTls } from "tls";
 import { BeamSocket } from "./socket";
 import type {
   MessageBody,
   RequestParams,
   ResponseBody,
   MessageHandler,
+  Reconnect,
+  ClientOpts,
 } from "./types";
 import { BeamError } from "./error";
 import { serialize, deserialize } from "./shared";
 
-export class BeamClient<T> extends EventEmitter {
+export class BeamClient<T, S extends Socket = Socket> extends EventEmitter {
   private nextRequestId = 1;
-  private socket: BeamSocket;
+  private bsock: BeamSocket<S>;
   private retryCount = 0;
-  private target: string | { host?: string; port: number };
   private requests: {
     [id in number]: (success: boolean, payload: string) => void;
   } = {};
@@ -23,20 +25,16 @@ export class BeamClient<T> extends EventEmitter {
   } = {};
   private closed = true;
   private reconnectTimeout?: NodeJS.Timeout;
+  private reconnect?: Reconnect;
 
   constructor(
-    target: string | { host?: string; port: number },
-    {
-      reconnect = 1000,
-    }: {
-      reconnect?: number | ((count: number) => number);
-    } = {}
+    private _connect: (socket?: S) => S,
+    { reconnect = 1000 }: ClientOpts = {}
   ) {
     super();
-    const socket = new Socket();
-    this.socket = new BeamSocket(socket);
-    this.target = target;
-    this.socket.on("message", (message: string) => {
+    this.reconnect = reconnect;
+    this.bsock = new BeamSocket<S>();
+    this.bsock.on("message", (message: string) => {
       const idx = message.indexOf("|", 2);
       const type = message[0];
       const topicOrRequestId = message.substring(1, idx);
@@ -56,30 +54,13 @@ export class BeamClient<T> extends EventEmitter {
         }
       }
     });
-    if (reconnect) {
-      socket.on("close", () => {
-        if (!this.closed) {
-          this.reconnectTimeout = setTimeout(
-            () => this.connect(),
-            typeof reconnect === "number"
-              ? reconnect
-              : reconnect(this.retryCount++)
-          );
-        }
-      });
-    }
-    socket.on("error", (e) => {
-      console.warn(`Error connecting to ${this.target}`);
-      console.warn(e.stack || e);
-      this.emit("error", e);
-    });
   }
 
   send<K extends keyof T>(
     topic: K,
     ...[payload]: MessageBody<K, T> extends void ? [] : [MessageBody<K, T>]
   ) {
-    return this.socket.send(`!${topic}|${serialize(payload)}`);
+    return this.bsock.send(`!${topic}|${serialize(payload)}`);
   }
 
   async request<K extends keyof T>(
@@ -105,7 +86,7 @@ export class BeamClient<T> extends EventEmitter {
             }
           };
         }),
-        this.socket.send(`?${topic}|${requestId}|${serialize(payload)}`),
+        this.bsock.send(`?${topic}|${requestId}|${serialize(payload)}`),
       ])
     )[0];
   }
@@ -117,34 +98,77 @@ export class BeamClient<T> extends EventEmitter {
     handlers.add(handler);
     const requestId = this.nextRequestId++;
     if (handlers.size === 1) {
-      await this.socket.send(`+${topic}|${requestId}`);
+      await this.bsock.send(`+${topic}|${requestId}`);
     }
     return async () => {
       handlers.delete(handler);
       if (handlers.size === 0) {
         delete this.messageHandlers[topic as number | string];
-        await this.socket.send(`-${topic}`);
+        await this.bsock.send(`-${topic}`);
       }
     };
   }
 
   connect() {
-    this.emit("connecting");
-    const socket = this.socket.socket;
     this.closed = false;
-    if (typeof this.target === "string") {
-      socket.connect(this.target);
-    } else {
-      socket.connect(this.target.port, this.target.host!);
+    const socket = this._connect(this.bsock.socket);
+    if (socket !== this.bsock.socket) {
+      if (this.reconnect) {
+        this.bsock.socket?.off("close", this.closeHandler);
+        socket.on("close", this.closeHandler);
+      }
+      this.bsock.socket?.off("error", this.errorHandler);
+      socket.on("error", this.errorHandler);
     }
+    this.bsock.socket = socket;
     return this;
   }
+
+  private closeHandler = () => {
+    if (!this.closed) {
+      this.reconnectTimeout = setTimeout(
+        () => this.connect(),
+        typeof this.reconnect === "number"
+          ? this.reconnect
+          : (this.reconnect as any)(this.retryCount++)
+      );
+    }
+  };
+
+  private errorHandler = (e: Error) => {
+    console.warn(e.stack || e);
+    this.emit("error", e);
+  };
 
   async close() {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
     }
     this.closed = true;
-    this.socket.socket.end();
+    this.bsock.socket?.end();
   }
+}
+
+export function createClient<T>(
+  opts: string | SocketConnectOpts
+): BeamClient<T, Socket>;
+export function createClient<T>(
+  opts: ConnectionOptions & { port: number; tls: true }
+): BeamClient<T, TLSSocket>;
+export function createClient<T>(opts: any) {
+  return typeof opts === "object" && "tls" in opts
+    ? new BeamClient<T, TLSSocket>((s = connectTls(opts)) =>
+        s.connecting ? s : s.connect(opts)
+      )
+    : new BeamClient<T, Socket>((s = new Socket()) => s.connect(opts));
+}
+
+export function connect<T>(
+  opts: string | SocketConnectOpts
+): BeamClient<T, Socket>;
+export function connect<T>(
+  opts: ConnectionOptions & { port: number; tls: true }
+): BeamClient<T, TLSSocket>;
+export function connect(opts: any): any {
+  return createClient(opts).connect();
 }

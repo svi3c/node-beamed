@@ -10,13 +10,9 @@
 
 - A lightweight protocol minimizes network traffic and provides high processing performance
 - The TypeScript API enables you to specify strictly typed endpoints and reuse the same type definitions on client and server side
-- Support for Unix, Windows, TCP
+- Support for Unix, Windows, TCP and TLS sockets
 - Requesting, messaging and publish / subscribe
 - No third party dependencies
-
-### Coming soon
-
-- [ ] Support for TLS
 
 ## Example
 
@@ -37,10 +33,10 @@ interface AuthApi {
 `server.ts`
 
 ```ts
-import { BeamServer } from "beamed";
+import { createServer } from "beamed";
 import { AuthApi, AuthTopics } from "./shared";
 
-const bs = new BeamServer<AuthApi>()
+const bs = createServer<AuthApi>()
   .onRequest(AuthTopics.login, authenticate)
   .listen("/tmp/auth-test");
 ```
@@ -48,10 +44,10 @@ const bs = new BeamServer<AuthApi>()
 `client.ts`
 
 ```ts
-import { BeamClient } from "beamed";
+import { connect } from "beamed";
 import { AuthApi, AuthTopics } from "./shared";
 
-const bc = new BeamClient<AuthApi>("/tmp/auth-test").connect();
+const bc = connect<AuthApi>("/tmp/auth-test");
 bc.request(AuthTopics.login, new Credentials("user", "p4ssw0rd")).then((user) =>
   console.log(user)
 );

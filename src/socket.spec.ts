@@ -9,7 +9,7 @@ describe("BeamSocket", () => {
 
   beforeEach(() => {
     socket = Object.assign(new EventEmitter(), {
-      connecting: false,
+      pending: false,
       write: jest.fn().mockImplementation((_, cb) => cb()),
     }) as any;
     bs = new BeamSocket(socket as any);

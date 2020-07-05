@@ -29,3 +29,9 @@ export type RequestParams<K extends keyof T, T> = T[K] extends {
     ? []
     : [Req]
   : [];
+
+export type Reconnect = number | ((count: number) => number);
+
+export interface ClientOpts {
+  reconnect?: Reconnect;
+}
