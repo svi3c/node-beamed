@@ -9,6 +9,9 @@
   },
   "license": "MIT",
   "repository": "github:svi3c/node-beamed",
+  "engines": {
+    "node": ">= 10.16.0"
+  },
   "scripts": {
     "build": "tsc",
     "test": "jest",
