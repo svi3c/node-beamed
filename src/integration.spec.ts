@@ -1,5 +1,5 @@
-import { BeamClient } from "./client";
-import { BeamServer } from "./server";
+import { BeamClient, connect } from "./client";
+import { BeamServer, createServer } from "./server";
 import { BeamError } from "./error";
 
 enum Errors {
@@ -25,9 +25,8 @@ describe("BeamServer + BeamClient", () => {
 
   describe("Unix", () => {
     beforeEach(async () => {
-      bs = new BeamServer<Api>().listen("/tmp/lean-tcp-test");
-      bc = new BeamClient<Api>("/tmp/lean-tcp-test");
-      bc.connect();
+      bs = createServer<Api>().listen("/tmp/lean-tcp-test");
+      bc = connect<Api>("/tmp/lean-tcp-test");
     });
 
     afterEach(() => {
