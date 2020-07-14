@@ -1,7 +1,6 @@
 import { EventEmitter } from "events";
 import { BeamSocket } from "./socket";
 import { Socket } from "net";
-import { DELIMITER } from "./shared";
 
 describe("BeamSocket", () => {
   let socket: jest.Mocked<Socket>;
@@ -19,7 +18,7 @@ describe("BeamSocket", () => {
     it("should write a message with delimiter to the underlying socket", async () => {
       await bs.send("Message");
       expect(socket.write).toHaveBeenCalledWith(
-        `Message${DELIMITER}`,
+        Buffer.from("7Message"),
         expect.any(Function)
       );
     });
@@ -30,14 +29,14 @@ describe("BeamSocket", () => {
       it("should be emitted if a message is finished", () => {
         const fn = jest.fn();
         bs.on("message", fn);
-        socket.emit("data", Buffer.from("abc"));
+        socket.emit("data", Buffer.from("6abc"));
         expect(fn).not.toHaveBeenCalled();
-        socket.emit("data", Buffer.from(`def${DELIMITER}ghi`));
+        socket.emit("data", Buffer.from(`def4ghi`));
         expect(fn).toHaveBeenCalledTimes(1);
-        expect(fn).toHaveBeenCalledWith("abcdef");
-        socket.emit("data", DELIMITER);
+        expect(fn).toHaveBeenCalledWith(Buffer.from("abcdef"));
+        socket.emit("data", Buffer.from("j"));
         expect(fn).toHaveBeenCalledTimes(2);
-        expect(fn).toHaveBeenCalledWith("ghi");
+        expect(fn).toHaveBeenCalledWith(Buffer.from("ghij"));
       });
     });
   });

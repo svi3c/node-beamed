@@ -1,7 +1,7 @@
 import { ListenOptions, Server } from "net";
 import { BeamSocket } from "./socket";
 import type { MessageHandler, RequestHandler, PushBody } from "./types";
-import { deserialize, serialize } from "./shared";
+import { deserialize, serialize, splitBuffer } from "./shared";
 
 export class BeamServer<T> {
   private sockets: BeamSocket[] = [];
@@ -16,10 +16,11 @@ export class BeamServer<T> {
   constructor(private server = new Server()) {
     this.server.on("connection", (s) => {
       const socket = new BeamSocket(s);
-      socket.on("message", async (message: string) => {
-        const type = message[0];
-        const tokens = message.substr(1).split("|");
-        const topic = tokens[0];
+      socket.on("message", async (message: Buffer) => {
+        let split1: Buffer;
+        const type = String.fromCharCode(message[0]);
+        [split1, message] = splitBuffer(message.slice(1), "|");
+        const topic = split1.toString();
         switch (type) {
           case "+":
             this.subscriptions[topic] = this.subscriptions[topic] || new Set();
@@ -33,17 +34,25 @@ export class BeamServer<T> {
             break;
           case "!":
             this.messageHandlers[topic]?.forEach((handler) =>
-              handler(deserialize(tokens[1]))
+              handler(message && deserialize(message))
             );
             break;
           case "?":
+            [split1, message] = splitBuffer(message, "|");
             try {
               const result = await this.requestHandlers[topic]?.(
-                deserialize(tokens[2])
+                message && deserialize(message)
               );
-              socket.send(`.${tokens[1]}|${serialize(result)}`);
+              socket.send(
+                Buffer.concat([
+                  Buffer.from(`.${split1}`),
+                  ...(result !== null && result !== undefined
+                    ? [Buffer.from("|"), serialize(result)]
+                    : []),
+                ])
+              );
             } catch (e) {
-              socket.send(`X${tokens[1]}|${e.code}|${e.message}`);
+              socket.send(`X${split1}|${e.code}|${e.message}`);
             }
         }
       });

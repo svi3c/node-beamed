@@ -1,10 +1,10 @@
 import { EventEmitter } from "events";
 import { Socket } from "net";
 import { promisify } from "util";
-import { DELIMITER } from "./shared";
 
 export class BeamSocket<S extends Socket = Socket> extends EventEmitter {
-  private buffered = "";
+  private _buffered: Buffer[] = [];
+  private _remainingBytes = 0;
   private _socket?: S;
 
   get socket() {
@@ -15,7 +15,7 @@ export class BeamSocket<S extends Socket = Socket> extends EventEmitter {
       this._removeEventListeners();
       this._socket = socket;
       this._attachEventListeners();
-      if (!(socket as any).pending) {
+      if (socket && !(socket as any).pending) {
         this.connectListener();
       }
     }
@@ -28,10 +28,13 @@ export class BeamSocket<S extends Socket = Socket> extends EventEmitter {
     }
   }
 
-  async send(message: string) {
+  async send(message: Buffer | string) {
     await this.waitForConnection();
     await promisify(this.socket!.write.bind(this.socket))(
-      `${message}${DELIMITER}`
+      Buffer.concat([
+        Buffer.from(message.length.toString()),
+        Buffer.from(message),
+      ])
     );
   }
 
@@ -49,15 +52,18 @@ export class BeamSocket<S extends Socket = Socket> extends EventEmitter {
   }
 
   private dataListener = (data: Buffer) => {
-    const chunks = data.toString().split(DELIMITER);
-    if (chunks.length > 1) {
-      const complete = [this.buffered + chunks[0], ...chunks.slice(1, -1)];
-      complete.forEach((message) => {
-        this.emit("message", message);
-      });
-      this.buffered = chunks[chunks.length - 1];
-    } else {
-      this.buffered += data;
+    while (data.length > 0) {
+      if (this._remainingBytes === 0) {
+        [this._remainingBytes, data] = readByteLength(data);
+      }
+      let part = data.slice(0, this._remainingBytes);
+      this._buffered.push(part);
+      this._remainingBytes -= part.length;
+      data = data.slice(part.length);
+      if (this._remainingBytes === 0) {
+        this.emit("message", Buffer.concat(this._buffered));
+        this._buffered = [];
+      }
     }
   };
 
@@ -69,3 +75,12 @@ export class BeamSocket<S extends Socket = Socket> extends EventEmitter {
       : Promise.resolve();
   }
 }
+
+const readByteLength = (data: Buffer) => {
+  let i = 0,
+    length = 0;
+  for (let x = data[i]; x >= 0x30 && x <= 0x39; i++, x = data[i]) {
+    length = length * 10 + x - 0x30;
+  }
+  return [length, data.slice(i)] as [number, Buffer];
+};
