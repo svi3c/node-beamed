@@ -3,3 +3,4 @@
 /yarn.lock
 /.editorconfig
 /.gitingore
+/.travis.yml

@@ -11,14 +11,14 @@ import type {
   ClientOpts,
 } from "./types";
 import { BeamError } from "./error";
-import { serialize, deserialize } from "./shared";
+import { serialize, deserialize, splitBuffer } from "./shared";
 
 export class BeamClient<T, S extends Socket = Socket> extends EventEmitter {
   private nextRequestId = 1;
   private bsock: BeamSocket<S>;
   private retryCount = 0;
   private requests: {
-    [id in number]: (success: boolean, payload: string) => void;
+    [id in number]: (success: boolean, payload: Buffer) => void;
   } = {};
   private messageHandlers: {
     [topic in number | string]: Set<MessageHandler<any, any>>;
@@ -34,22 +34,22 @@ export class BeamClient<T, S extends Socket = Socket> extends EventEmitter {
     super();
     this.reconnect = reconnect;
     this.bsock = new BeamSocket<S>();
-    this.bsock.on("message", (message: string) => {
-      const idx = message.indexOf("|", 2);
-      const type = message[0];
-      const topicOrRequestId = message.substring(1, idx);
-      const payload = message.substr(idx + 1);
+    this.bsock.on("message", (message: Buffer) => {
+      let split1: Buffer;
+      const type = String.fromCharCode(message[0]);
+      [split1, message] = splitBuffer(message.slice(1), "|", 1);
+      const topicOrRequestId = split1.toString();
       switch (type) {
         case "X":
         case ".": {
           const requestId = Number(topicOrRequestId);
-          this.requests[requestId](type === ".", payload);
+          this.requests[requestId](type === ".", message);
           delete this.requests[requestId];
           break;
         }
         case "!": {
           this.messageHandlers[topicOrRequestId]?.forEach((handler) =>
-            handler(deserialize(payload))
+            handler(message && deserialize(message))
           );
         }
       }
@@ -71,16 +71,17 @@ export class BeamClient<T, S extends Socket = Socket> extends EventEmitter {
     return (
       await Promise.all([
         new Promise<any>((resolve, reject) => {
-          this.requests[requestId] = (success: boolean, payload: any) => {
+          this.requests[requestId] = (success: boolean, payload: Buffer) => {
             if (success) {
               resolve(deserialize(payload));
             } else {
-              const idx = payload.indexOf("|");
-              const code = payload.substr(0, idx);
+              let split1: Buffer;
+              [split1, payload] = splitBuffer(payload, "|", 1);
+              const code = split1.toString();
               reject(
                 new BeamError(
                   isNaN(Number(code)) ? code : Number(code),
-                  payload.substr(idx + 1)
+                  payload.toString()
                 )
               );
             }
